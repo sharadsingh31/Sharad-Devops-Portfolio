@@ -1,0 +1,95 @@
+trigger:
+- develop
+
+
+pool: ShAgentPool
+
+stages:
+  - stage: ScanAnalysis
+    jobs:
+      - job: staticAnalysis
+        displayName: Static Analysis(SonarQube)
+        steps:
+        - task: PowerShell@2
+          displayName: SonarQube Scan
+          inputs:
+            targetType: 'inline'
+            script: 'sonar -D sonar.host.url=http://localhost:9000 -D sonar.token=sqp_ea008623dbb614bd33e99894f778f821e2f44e8f - D sonar.projectKey=Todo-UIMonolith'
+
+      - job: lint
+        displayName: Scan Analysis Lint
+        steps:
+        - task: PowerShell@2
+          displayName: Lint (Biome)
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              mkdir reports
+              biome lint .\src --reporter=json > reports/biome-report.json
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+        
+        - task: PublishPipelineArtifact@1
+          displayName: Publish Biome report
+          inputs:
+            targetPath: '$(System.DefaultWorkingDirectory)/reports'
+            artifact: 'biome-reports'
+            publishLocation: 'pipeline'
+          
+        - task: PowerShell@2
+          displayName: Lint CSS(Styelint)
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              npm install -g stylelint
+              npm install -g stylelint-config-standard
+              New-Item -ItemType Directory -Force -Path reports
+              stylelint "src/**/*.css" --formatter json `
+              | Out-File -Encoding utf8 reports/stylelint-report.json
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+        
+        - task: PublishBuildArtifacts@1
+          displayName: Publish Styelint report
+          inputs:
+            PathtoPublish: '$(System.DefaultWorkingDirectory)/reports/stylelint-report.json'
+            ArtifactName: 'stylelint-report'
+            publishLocation: 'Container'
+
+        
+        - task: PowerShell@2
+          displayName: Lint YAML(yamllint)
+          inputs:
+            targetType: 'inline'
+            script: |
+              python -m pip install --user yamllint
+              New-Item -ItemType Directory -Force -Path reports
+              python -m yamllint "$(System.DefaultWorkingDirectory)" > reports/yamllint-report.txt
+              if ($LASTEXITCODE -ne 0) { exit 0 }
+        
+        - task: PublishBuildArtifacts@1
+          displayName: Publish yamllint report
+          inputs:
+            PathtoPublish: '$(System.DefaultWorkingDirectory)/reports/yamllint-report.txt'
+            ArtifactName: 'yamllint-report'
+            publishLocation: 'Container'
+
+        - task: PowerShell@2
+          displayName: Lint Markdown(markdownlint)
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              npm install -g markdownlint-cli
+              New-Item -ItemType Directory -Force -Path reports
+              markdownlint "$(System.DefaultWorkingDirectory)" > reports/markdownlint-report.txt
+              if ($LASTEXITCODE -ne 0) { exit 0 }
+
+        
+        - task: PublishBuildArtifacts@1
+          displayName: Publish markdownlint report
+          inputs:
+            PathtoPublish: '$(System.DefaultWorkingDirectory)/reports/markdownlint-report.txt'
+            ArtifactName: 'markdown-report'
+            publishLocation: 'Container'
+
