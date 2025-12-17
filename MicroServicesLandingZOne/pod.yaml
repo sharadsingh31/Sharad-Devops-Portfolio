@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: myapp-nginx
+  labels: 
+    app.kubernetes.io/name: myapp-nginx
+
+spec:
+  containers:
+    - name: myappcontainer
+      image: nginx
+      ports: 
+        - containerPort: 80
+       
+      
+
+    
