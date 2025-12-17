@@ -1,0 +1,190 @@
+trigger: 
+ branches:
+  include:
+    - main
+    - feature/*
+ paths:
+   include:
+     - environment/Dev
+     - environment/QA
+
+pool: ShAgentPool
+
+
+
+variables:
+ WORKING_DIR: $(System.DefaultWorkingDirectory)/Environment/Dev
+ SERVICE_CONNECTION: SP-Infra-Framework
+ BACKEND_KEY: devterraform.tfstate
+ 
+
+
+    
+
+
+stages:
+ - stage: PreCommit
+   displayName: Pre-Commit / Static Analysis Stage
+   
+   jobs:
+    - job: TerraformInitValidatefmt
+      displayName: terraform init validate fmt
+      steps:
+      - task: TerraformInstaller@1
+        inputs:
+          terraformVersion: 'latest'
+      - task: TerraformTask@5
+        displayName: Terraform Init
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(WORKING_DIR)'
+          backendServiceArm: '$(SERVICE_CONNECTION)'
+          backendAzureRmStorageAccountName: 'singhstgpipeline'
+          backendAzureRmContainerName: 'singhcontainerpipeline'
+          backendAzureRmKey: '$(BACKEND_KEY)'
+
+      - task: TerraformTask@5
+        displayName: Terraform Validate
+        inputs:
+          provider: 'azurerm'
+          command: 'validate'
+          workingDirectory: '$(WORKING_DIR)'
+
+      - task: TerraformTask@5
+        displayName: Terraform fmt
+        inputs:
+          provider: 'azurerm'
+          command: 'custom'
+          workingDirectory: '$(WORKING_DIR)'
+          outputTo: 'console'
+          customCommand: 'fmt'
+          environmentServiceNameAzureRM: 'SP-Infra-Framework'
+    
+    
+
+    - job: scantool
+      displayName: tfscan Tflint Checkov trufflehog
+      steps:
+      - task: tfsec@1
+        inputs:
+          version: 'v1.26.0'
+          dir: '$(WORKING_DIR)'
+      
+   
+      - task: PowerShell@2
+        displayName: tflint
+        continueOnError: true
+        inputs:
+          targetType: 'inline'
+          script: |
+            winget install TerraformLinters.tflint
+            ls
+            tflint
+          workingDirectory: '$(WORKING_DIR)'
+      
+      - task: PowerShell@2
+        displayName: Checkov 
+        continueOnError: true
+        inputs:
+          targetType: 'inline'
+          script: 'checkov -d ./'
+          workingDirectory: '$(WORKING_DIR)'
+      
+      - task: PowerShell@2
+        displayName: trufflehog
+        continueOnError: true
+        inputs:
+          targetType: 'inline'
+          script: 'trufflehog filesystem .'
+          workingDirectory: '$(WORKING_DIR)'
+      
+ - stage: costStage
+   dependsOn: PreCommit
+   displayName: Cost & Impact Assessment Stage
+   jobs:
+   - job: InfraCost
+     continueOnError: true
+     displayName: Infra Cost
+     steps:
+     - task: PowerShell@2
+       displayName: Infracost analysis
+       inputs:
+         targetType: 'inline'
+         script: |
+           Write-Host "API Key = $Env:INFRACOST_API_KEY"
+           infracost breakdown --path=$(WORKING_DIR)
+         workingDirectory: '$(Working_DIR)'
+       
+
+ - stage: plan
+   displayName: Plan and Review Stage
+   jobs:
+   - job: Terraformplan
+     displayName: Terraform Plan
+     steps:
+     - task: TerraformInstaller@1
+       inputs:
+         terraformVersion: 'latest'
+     - task: TerraformTask@5
+       displayName:  Terraform init
+       inputs:
+         provider: 'azurerm'
+         command: 'init'
+         workingDirectory: '$(WORKING_DIR)'
+         backendServiceArm: '$(SERVICE_CONNECTION)'
+         backendAzureRmStorageAccountName: 'singhstgpipeline'
+         backendAzureRmContainerName: 'singhcontainerpipeline'
+         backendAzureRmKey: '$(BACKEND_KEY)'
+         
+
+     - task: TerraformTask@5
+       displayName: Terraform plan
+       inputs:
+         provider: 'azurerm'
+         command: 'plan'
+         workingDirectory: '$(WORKING_DIR)'
+         environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+
+ - stage: approval
+   dependsOn: plan
+   displayName: Approval & Governance Stage
+   jobs:
+   - job: ManualApproval
+     displayName: Manual approval
+     pool: server
+     steps:
+     - task: ManualValidation@1
+       displayName: Manual Validation
+       inputs:
+         notifyUsers: 'sharaderic31@gmail.com'
+
+ - stage: apply
+   dependsOn: approval
+   displayName: Deploy / Apply Stage
+   
+   jobs:
+   - job: terraformapply
+     displayName: Terraform Apply
+     steps:
+     - task: TerraformTask@5
+       displayName: Terraform init
+       inputs:
+         provider: 'azurerm'
+         command: 'init'
+         workingDirectory: '$(WORKING_DIR)'
+         backendServiceArm: '$(SERVICE_CONNECTION)'
+         backendAzureRmStorageAccountName: 'singhstgpipeline'
+         backendAzureRmContainerName: 'singhcontainerpipeline'
+         backendAzureRmKey: '$(BACKEND_KEY)'
+         
+
+     - task: TerraformTask@5
+       displayName: Terraform Apply
+       inputs:
+         provider: 'azurerm'
+         command: 'apply'
+         workingDirectory: '$(WORKING_DIR)'
+         commandOptions: '-auto-approve'
+         environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+
