@@ -3,12 +3,12 @@ module "rg" {
   rgdetails = var.rgdetails
 }
 
-# module "stg" {
-#   source          = "../../Module/Azurerm_Storage_account"
-#   depends_on = [ module.rg ]
-#   storage_account = var.storage_account
+module "stg" {
+  source          = "../../Module/Azurerm_Storage_account"
+  depends_on = [ module.rg ]
+  storage_account = var.storage_account
 
-# }
+}
 
 module "pip" {
   source = "../../Module/Azurerm_Public_ip"
@@ -23,20 +23,25 @@ module "vnet" {
 
 }
 
+module "bastion" {
+  source = "../../Module/Azurerm_Bastion"
+  bastion = var.bastion
+}
 
-# module "ACR" {
-#   source     = "../../Module/Azurerm_ACR"
-#   depends_on = [module.rg]
-#   azureacr   = var.azureacr
 
-# }
+module "ACR" {
+  source     = "../../Module/Azurerm_ACR"
+  depends_on = [module.rg]
+  azureacr   = var.azureacr
 
-# module "AKS" {
-#   source     = "../../Module/Azurerm_AKS"
-#   depends_on = [module.rg]
-#   aksdetails = var.aksdetails
+}
 
-# }
+module "AKS" {
+  source     = "../../Module/Azurerm_AKS"
+  depends_on = [module.rg]
+  aksdetails = var.aksdetails
+
+}
 
 module "keyvault" {
   source     = "../../Module/Azurerm_KeyVault"
@@ -52,15 +57,15 @@ module "vm" {
   pip_id = module.pip.pip_id
 }
 
-# module "sqlserver" {
-#   source     = "../../Module/Azurerm_Sql_Server"
-#   depends_on = [module.rg]
-#   sqlserver  = var.sqlserver
-# }
+module "sqlserver" {
+  source     = "../../Module/Azurerm_Sql_Server"
+  depends_on = [module.rg]
+  sqlserver  = var.sqlserver
+}
 
-# module "sqldb" {
-#   source     = "../../Module/Azurerm_Sql_db"
-#   depends_on = [module.sqlserver]
-#   sqldb      = var.sqldb
+module "sqldb" {
+  source     = "../../Module/Azurerm_Sql_db"
+  depends_on = [module.sqlserver]
+  sqldb      = var.sqldb
 
-# }
+}
