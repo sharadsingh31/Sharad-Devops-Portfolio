@@ -1,22 +1,32 @@
-variable "resource_grp" {
-  type = map(object({
-    name       = string
-    location   = string
-    managed_by = optional(string)
-    tags       = optional(map(string))
+variable "dev_resource_group" {
+  type = map(any)
+}
 
-  }))
+variable "dev_storage_account" {
+  type = map(any)
+}
+
+variable "dev_virtual_network" {
+  type = map(any)
+}
+
+variable "dev_subnet" {
+  type = map(any)
+}
+
+variable "dev_public_ip" {
+  type = map(any)
 
 }
-variable"storage_account"{
- type = map(object({
-    name = string
-    resource_group_name = string
-    location = string
-    account_tier = string
-    account_replication_type = string
+variable "dev_vm_configs" {
+  type = map(any)
+}
 
- })
+variable "dev_mssql_server" {
+  type = map(any)
+}
 
- )
- }
+variable "dev_mssql_database" {
+  type = map(any)
+}
+
